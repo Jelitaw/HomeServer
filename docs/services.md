@@ -8,17 +8,19 @@ The server hosts a collection of self-hosted applications using Docker. Services
 
 **Purpose:** Reverse proxy
 
-Caddy provides the central HTTP(S) entry point for the hosted web applications. It receives requests for the configured service hostnames and forwards them to the corresponding application containers.
+Caddy provides the central HTTP(S) entry point for the hosted web applications. It receives requests for configured service hostnames and forwards them to the corresponding application containers.
 
-Caddy is connected to the shared `homelab` Docker network so that it can communicate with the hosted services without exposing their application ports directly.
+Caddy is connected to the shared `homelab` Docker network, allowing it to communicate with the hosted services without exposing their application ports directly to the host.
 
-### WireGuard
+### WireGuard / WG-Easy
 
 **Purpose:** Remote network access
 
-WireGuard provides authenticated VPN access to the home network.
+WireGuard provides authenticated VPN access to the home network. WG-Easy is used to manage the WireGuard server and its client configurations.
 
-Remote devices first connect to the public VPN endpoint and, after successful authentication, can access the home network and its services using the same network and DNS infrastructure as devices physically connected at home.
+Remote devices connect to the VPN endpoint and, after successful authentication, can access the home network and its services using the same network and DNS infrastructure as devices physically connected at home.
+
+The WireGuard tunnel and the WG-Easy management interface use separate ports.
 
 ### Pi-hole
 
@@ -30,9 +32,9 @@ It is responsible for:
 
 * DNS blocking
 * internal DNS resolution
-* resolving hostnames for the self-hosted services
+* resolving hostnames for self-hosted services
 
-The internal DNS configuration allows service hostnames to resolve to the reverse proxy rather than requiring individual services to be publicly exposed.
+The internal DNS configuration allows service hostnames to resolve to the reverse proxy rather than requiring individual application services to be directly exposed.
 
 ---
 
@@ -44,7 +46,7 @@ The internal DNS configuration allows service hostnames to resolve to the revers
 
 Nextcloud provides self-hosted file storage as well as calendar and contact synchronization.
 
-The deployment consists of multiple containers:
+The deployment consists of:
 
 * Nextcloud application
 * MariaDB database
@@ -60,7 +62,7 @@ On mobile devices, Nextcloud is integrated with the Android ecosystem using dedi
 
 Immich provides self-hosted photo and video management, including automatic mobile photo backup.
 
-The deployment consists of multiple containers:
+The deployment consists of:
 
 * Immich server
 * Immich machine-learning service
@@ -95,11 +97,11 @@ On mobile devices, Mealie is used as a Progressive Web App (PWA), providing an a
 
 Firefly III provides self-hosted personal finance management.
 
-The deployment consists of multiple containers:
+The deployment consists of:
 
 * Firefly III application
 * PostgreSQL database
-* scheduled task container
+* dedicated scheduled-task container
 
 The service is accessed through Caddy.
 
@@ -111,7 +113,7 @@ A mobile client, Waterfly III, is used as an alternative frontend for accessing 
 
 SparkyFitness provides self-hosted fitness and health tracking.
 
-The deployment consists of multiple containers:
+The deployment consists of:
 
 * SparkyFitness frontend
 * SparkyFitness backend
@@ -127,19 +129,19 @@ Wearable data can be collected through Gadgetbridge and made available through A
 
 The following table summarizes the current deployment:
 
-| Service       | Containers | Main Function                     |
-| ------------- | ---------: | --------------------------------- |
-| Caddy         |          1 | Reverse proxy                     |
-| WireGuard     |          1 | VPN                               |
-| Pi-hole       |          1 | DNS and blocking                  |
-| Vaultwarden   |          1 | Password management               |
-| Mealie        |          1 | Recipe management                 |
-| Immich        |          4 | Photo management                  |
-| Nextcloud     |          3 | Cloud storage and synchronization |
-| Firefly III   |          3 | Personal finance                  |
-| SparkyFitness |          3 | Fitness tracking                  |
+| Service             | Containers | Main Function                     |
+| ------------------- | ---------: | --------------------------------- |
+| Caddy               |          1 | Reverse proxy                     |
+| WireGuard / WG-Easy |          1 | VPN and management                |
+| Pi-hole             |          1 | DNS and blocking                  |
+| Vaultwarden         |          1 | Password management               |
+| Mealie              |          1 | Recipe management                 |
+| Immich              |          4 | Photo management                  |
+| Nextcloud           |          3 | Cloud storage and synchronization |
+| Firefly III         |          3 | Personal finance                  |
+| SparkyFitness       |          3 | Fitness tracking                  |
 
-The exact container images and deployment configuration are intentionally not reproduced in this public documentation. The repository describes the architecture and design of the infrastructure rather than serving as a copy of the live deployment configuration.
+The repository also contains sanitized Docker Compose examples for the individual service stacks. Secrets, persistent application data, and deployment-specific configuration are intentionally excluded.
 
 ## Shared Docker Network
 
@@ -169,7 +171,7 @@ Conceptually:
         └──► Other hosted services
 ```
 
-This network provides the internal connectivity required by the application stacks while keeping the services behind the reverse proxy.
+The shared network provides the internal connectivity required by the application stacks while keeping application services behind the reverse proxy.
 
 ## Service Access
 

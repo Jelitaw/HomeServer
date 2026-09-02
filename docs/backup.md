@@ -1,33 +1,37 @@
 # Backup and Data Protection
 
-The server stores personal application data on a dedicated SSD. To protect this data against hardware failures and accidental data loss, a second, larger HDD is used as a dedicated backup target.
+The server stores persistent application data on a dedicated SSD. To protect this data against hardware failures and accidental data loss, a second, larger HDD is used as a dedicated backup target.
 
-Backups are performed automatically once per day using Restic.
+Backups are performed automatically once per day during a nightly backup process using Restic.
+
+The backup mechanism operates independently from the Docker application stacks. This separates data protection from the availability of the individual services.
 
 ## Storage Architecture
 
 The storage setup consists of two external drives with different purposes:
 
-| Storage | Purpose                 | Usage        |
-| ------- | ----------------------- | ------------ |
-| SSD     | Active application data | Continuous   |
-| HDD     | Backup storage          | Daily backup |
+| Storage | Purpose                 | Usage          |
+| ------- | ----------------------- | -------------- |
+| SSD     | Active application data | Continuous     |
+| HDD     | Backup storage          | Nightly backup |
 
 The SSD is used for the live application data of the self-hosted services.
 
-The HDD is primarily used for backups and is normally inactive outside the backup process. This reduces unnecessary operating time for the backup drive.
+The HDD is dedicated primarily to backups and is normally inactive outside the backup window. This reduces unnecessary operating time of the backup drive.
 
 Conceptually:
 
 ```text
                     Server
+
                       │
+
                       │
               ┌───────▼───────┐
               │   Active SSD  │
               │               │
               │ Application   │
-              │ Data          │
+              │     Data      │
               └───────┬───────┘
                       │
                       │ Nightly backup
@@ -38,9 +42,10 @@ Conceptually:
                       │
                       ▼
               ┌───────────────┐
-              │ Backup HDD    │
+              │   Backup HDD  │
               │               │
-              │ Restic Backup │
+              │    Restic     │
+              │   Repository  │
               └───────────────┘
 ```
 
@@ -48,25 +53,36 @@ Conceptually:
 
 Restic is used as the backup tool.
 
-The backup process runs automatically once per day and creates a backup of the relevant application data on the dedicated backup storage.
+The backup process runs automatically once per day and creates a Restic snapshot containing the selected persistent application data on the dedicated backup storage.
 
-The backup process is separate from the applications themselves. A failure or restart of an individual Docker service therefore does not prevent the backup mechanism from operating independently.
+The backup process is separate from the Docker services themselves. A failure or restart of an individual application container therefore does not directly prevent the host-level backup process from operating.
 
-The backup configuration contains information about:
+The backup configuration defines:
 
 * the directories to back up
 * excluded data
-* the backup repository
-* required Restic credentials
+* the Restic repository
+* the required Restic credentials
+* retention and pruning rules
 * logging
 
-Sensitive credentials are kept outside the public repository.
+The current backup script uses Restic retention policies to retain a defined number of daily, weekly, and monthly snapshots.
+
+Sensitive credentials and the live backup configuration are kept outside the public repository.
+
+The repository contains only sanitized examples of the backup configuration.
 
 ## Backup Scope
 
 The backup is intended to protect the persistent data required to restore the self-hosted applications.
 
-This primarily includes application data stored on the active SSD.
+This primarily includes application data stored on the active SSD, such as:
+
+* application configuration
+* databases
+* uploaded files
+* user-generated content
+* other persistent application state
 
 The Docker containers themselves are not considered the primary backup target. Containers can generally be recreated from their respective images and configuration, while persistent application data requires explicit protection.
 
@@ -78,7 +94,9 @@ Container / Image
        │ Recreate
        ▼
    Application
-
+       │
+       │ Uses
+       ▼
 Persistent Data
        │
        │ Restore
@@ -86,7 +104,7 @@ Persistent Data
 Backup Repository
 ```
 
-The combination of reproducible container images and backed-up persistent data provides the basis for rebuilding the application environment after a failure.
+The combination of reproducible container images, documented configuration, and backed-up persistent data provides the basis for rebuilding the application environment after a failure.
 
 ## Backup Schedule
 
@@ -96,24 +114,41 @@ The general workflow is:
 
 ```text
 1. Application data
+
         │
         ▼
+
 2. Start nightly backup
+
         │
         ▼
+
 3. Restic reads selected data
+
         │
         ▼
-4. Data is stored in backup repository
+
+4. Create / update Restic snapshot
+
         │
         ▼
-5. Backup process completes
+
+5. Apply retention policy and prune old snapshots
+
         │
         ▼
-6. Backup storage becomes inactive
+
+6. Record backup status
+
+        │
+        ▼
+
+7. Backup storage becomes inactive
 ```
 
 The backup drive is not intended to operate continuously.
+
+The backup script also records the outcome of the backup process so that failed backup runs can be identified.
 
 ## Data Flow
 
@@ -144,43 +179,53 @@ The current data-protection architecture can be summarized as:
 
 ## Failure Scenarios
 
-The backup strategy is primarily intended to protect against failures affecting the active storage.
-
-Examples include:
+The backup strategy is primarily intended to protect against failures affecting the active storage or the logical state of application data.
 
 ### Active SSD Failure
 
-If the active SSD fails, the application data can be restored from the Restic backup.
+If the active SSD fails, the application data can be restored from the Restic repository.
 
 The expected recovery process is conceptually:
 
 ```text
 Failed SSD
+
     │
     ▼
+
 Replace / repair storage
+
     │
     ▼
+
 Recreate application environment
+
     │
     ▼
+
 Restore persistent data
+
     │
     ▼
+
 Resume service operation
 ```
 
+The exact recovery procedure depends on the affected application and its configuration.
+
 ### Accidental Data Deletion
 
-If important data is accidentally deleted from the active storage, a previous backup can provide a recovery point.
+If important data is accidentally deleted from the active storage, a previous Restic snapshot can provide a recovery point.
 
-The exact recovery point depends on the available Restic snapshots and backup retention.
+The exact recovery point depends on the available snapshots and the configured retention policy.
 
 ### Server Failure
 
-If the server itself fails while the backup HDD remains intact, the backup repository can be used as the source for restoring the persistent application data to a replacement system.
+If the server itself fails while the backup HDD remains intact, the Restic repository can be used as the source for restoring persistent application data to a replacement system.
 
-The application containers can then be recreated using the required container images and sanitized configuration.
+The application containers can then be recreated using the required container images and documented configuration.
+
+This is one reason the infrastructure configuration and architecture are documented separately from the live server.
 
 ## Important Limitation: Local Backup
 
@@ -247,6 +292,8 @@ The target architecture would provide an additional copy at a physically indepen
 
 This would protect against scenarios in which both the server and the local backup drive are lost.
 
+The off-site solution has not yet been implemented.
+
 ## Security of Backup Data
 
 Backup credentials and other sensitive backup configuration are not part of the public infrastructure repository.
@@ -260,7 +307,16 @@ In particular, the following types of information are kept private:
 * private keys
 * other authentication material
 
-The public repository only documents the architecture and may contain sanitized examples.
+The public repository only documents the architecture and contains sanitized examples such as:
+
+```text
+restic/
+├── backup.sh.example
+├── env.example
+└── excludes.txt.example
+```
+
+The actual Restic repository, password file, environment configuration, logs, and application data are not published.
 
 ## Backup Philosophy
 
@@ -270,8 +326,10 @@ Running the applications successfully does not guarantee that their data can be 
 
 The infrastructure therefore separates:
 
-1. **Active storage** — used by the applications.
-2. **Local backup storage** — used to recover from hardware or logical failures.
+1. **Active storage** — used by the applications during normal operation.
+
+2. **Local backup storage** — used to recover from hardware failures, accidental deletion, and other logical failures.
+
 3. **Future off-site storage** — intended to protect against physical loss of the local infrastructure.
 
 The current setup provides a practical local recovery mechanism while explicitly identifying off-site backup as an important remaining improvement.

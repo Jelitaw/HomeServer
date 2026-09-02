@@ -1,6 +1,8 @@
 # Networking
 
-The server is integrated into the home network and is designed so that hosted applications are accessible from the home network and from authenticated remote VPN clients, while remaining inaccessible to guests and not directly exposed to the public Internet.
+The server is integrated into the home network and provides access to hosted applications for devices on the home network and authenticated remote VPN clients. The guest network is isolated from the home network.
+
+Application services are not intended to be directly exposed to the public Internet. Remote access is provided through an authenticated WireGuard VPN connection.
 
 ## Network Overview
 
@@ -27,14 +29,14 @@ PC / Laptop / Phone
         │
         ├── Pi-hole
         │      │
-        │      └── Internal DNS
+        │      └── Internal DNS + DNS blocking
         │
         └── Caddy
                │
                └── Docker Services
 ```
 
-The home network uses Pi-hole as its DNS resolver. This provides both network-wide DNS blocking and internal resolution of the hosted services.
+Pi-hole is configured as the DNS resolver for the home network. It provides network-wide DNS blocking and internal resolution of the hostnames used for the self-hosted applications.
 
 For example:
 
@@ -51,13 +53,13 @@ immich.example.net
      Immich
 ```
 
-The actual service hostname therefore does not need to resolve to a publicly accessible application server.
+The service hostname therefore resolves to the internal reverse-proxy path rather than requiring the application itself to be publicly reachable.
 
 ## Remote Access
 
 Remote devices such as laptops and phones can access the infrastructure from mobile networks or external Wi-Fi.
 
-The remote connection consists of two distinct DNS stages.
+The remote connection consists of two distinct DNS and networking stages.
 
 ### 1. Finding the VPN endpoint
 
@@ -85,13 +87,15 @@ Laptop / Phone
  WireGuard
 ```
 
-The public DNS record points the VPN hostname to the current public address of the home connection. The Fritz!Box provides the dynamic DNS endpoint and forwards the WireGuard connection to the VPN service.
+The public DNS record points the VPN hostname to the current public address of the home connection. The Fritz!Box provides the dynamic DNS endpoint and handles the incoming WireGuard connection.
 
-WireGuard is the only intended public entry point to the infrastructure.
+The WireGuard endpoint is the only service intended to be reachable from the public Internet through the router's port-forwarding configuration.
+
+The WG-Easy web interface is separate from the WireGuard tunnel itself. It is used to manage the VPN and is accessed through the internal network/reverse-proxy setup.
 
 ### 2. Accessing internal services
 
-After the WireGuard tunnel has been successfully authenticated, the remote device has network access to the home network.
+After the WireGuard tunnel has been successfully authenticated, the remote device receives network access to the home network.
 
 It can then use Pi-hole for internal DNS resolution just like a device physically connected to the home network.
 
@@ -116,7 +120,7 @@ Remote Laptop / Phone
      Immich
 ```
 
-The VPN therefore provides **network-level access** rather than exposing individual applications directly to the Internet.
+The VPN therefore provides **network-level access** rather than requiring individual applications to be exposed directly to the Internet.
 
 ## DNS
 
@@ -142,15 +146,15 @@ nextcloud.example.net
 vaultwarden.example.net
 ```
 
-These hostnames are resolved internally and direct the client towards the Caddy reverse proxy.
+These hostnames resolve internally and direct clients towards the Caddy reverse proxy.
 
-This means that the applications themselves do not need to be individually exposed to the public Internet.
+This allows the application containers to remain behind the reverse proxy instead of requiring their individual service ports to be exposed to the Internet.
 
 ## Reverse Proxy
 
-Caddy acts as the reverse proxy for the hosted web applications.
+Caddy acts as the central reverse proxy for the hosted web applications.
 
-Once Pi-hole has resolved a service hostname, the client connects to Caddy. Caddy then determines the requested service and forwards the request to the corresponding Docker container.
+Once Pi-hole has resolved a service hostname, the client connects to Caddy. Caddy determines the requested hostname and forwards the request to the corresponding Docker service on the internal Docker network.
 
 Conceptually:
 
@@ -158,7 +162,6 @@ Conceptually:
 Client
   │
   │ HTTPS request
-  │
   ▼
 Caddy
   │
@@ -170,7 +173,9 @@ Caddy
   └──► SparkyFitness
 ```
 
-This provides a consistent access mechanism for the different applications while keeping the individual application containers behind the reverse proxy.
+Caddy provides a consistent HTTPS-based access mechanism for the different applications while keeping the application containers behind the reverse proxy.
+
+The application stacks communicate internally over the shared Docker network `homelab` where required.
 
 ## Guest Network
 
@@ -186,14 +191,14 @@ Guest Phone
 Guest Network
      │
      └──────────► Internet
-
+     
      X
      │
      ▼
 Home Network
 ```
 
-As guest devices are not part of the home network, they do not use the internal Pi-hole DNS configuration and cannot resolve or access the internal service endpoints.
+As guest devices are not part of the home network, they do not use the internal DNS configuration provided to trusted clients and cannot access the internal service endpoints.
 
 This separation allows visitors to use the Internet without granting them access to the self-hosted infrastructure.
 
@@ -208,4 +213,8 @@ The resulting access model is:
 | Authenticated WireGuard |      Yes |          Yes |     Yes |             Yes |
 | Guest Wi-Fi             |      Yes |           No |      No |              No |
 
-The central principle is that **application access follows network access**. Services are available to trusted devices inside the home network and to authenticated VPN clients, while the guest network and unauthenticated Internet users remain outside the trusted network boundary.
+The central principle is that **application access follows network access**.
+
+Services are available to trusted devices inside the home network and to authenticated VPN clients. Guest devices and unauthenticated Internet users remain outside the trusted network boundary.
+
+The architecture therefore uses the VPN as the remote-access boundary, Pi-hole for internal DNS and DNS filtering, and Caddy as the central application gateway.
