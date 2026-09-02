@@ -1,0 +1,133 @@
+# Sanitized example configuration.
+# The domain names and credentials used by the live deployment
+# are intentionally replaced with placeholders.
+
+vaultwarden.example.net {
+    reverse_proxy vaultwarden:80
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+pihole.example.net {
+    reverse_proxy pihole:80
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+# This endpoint provides access to the VPN management interface.
+# The WireGuard tunnel itself uses its own UDP endpoint.
+wireguard.example.net {
+    reverse_proxy wg-easy:51821
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+nextcloud.example.net {
+    reverse_proxy nextcloud:80 {
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-For {remote}
+    }
+
+    encode gzip
+
+    header {
+        Strict-Transport-Security "max-age=15552000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "no-referrer"
+    }
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+immich.example.net {
+    reverse_proxy immich_server:2283 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode gzip
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+firefly.example.net {
+    reverse_proxy firefly:8080
+
+    encode gzip
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+mealie.example.net {
+    reverse_proxy mealie:9000
+
+    encode gzip
+
+    header {
+        Strict-Transport-Security "max-age=15552000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "no-referrer"
+    }
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}
+
+fitness.example.net {
+    reverse_proxy sparkyfitness-frontend:80
+
+    encode gzip
+
+    header {
+        Strict-Transport-Security "max-age=15552000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "no-referrer"
+    }
+
+    tls {
+        dns porkbun {
+            api_key {env.PORKBUN_API_KEY}
+            api_secret_key {env.PORKBUN_SECRET_API_KEY}
+        }
+    }
+}

@@ -1,0 +1,72 @@
+services:
+  firefly:
+    image: fireflyiii/core:version-6.6
+    container_name: firefly
+    restart: unless-stopped
+
+    environment:
+      APP_KEY: ${APP_KEY}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      TZ: ${TZ}
+      APP_URL: https://firefly.example.net
+
+      STATIC_CRON_TOKEN: ${STATIC_CRON_TOKEN}
+
+      DB_CONNECTION: pgsql
+      DB_HOST: firefly-db
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      TRUSTED_PROXIES: "*"
+
+    depends_on:
+      - firefly-db
+
+    networks:
+      - homelab
+
+  firefly-db:
+    image: postgres:16-alpine
+    container_name: firefly_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+
+    networks:
+      - homelab
+
+  cron:
+    image: alpine:3.23
+    restart: always
+    container_name: firefly_iii_cron
+
+    env_file:
+      - .env
+
+    depends_on:
+      - firefly
+
+    command: >
+      sh -c "
+        apk add tzdata &&
+        ln -fs /usr/share/zoneinfo/$$TZ /etc/localtime &&
+        echo \"* * * * * wget -qO- http://firefly:8080/api/v1/cron/$$STATIC_CRON_TOKEN;echo\"
+        | crontab - &&
+        crond -f -L /dev/stdout
+      "
+
+    networks:
+      - homelab
+
+networks:
+  homelab:
+    external: true

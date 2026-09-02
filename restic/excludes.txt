@@ -1,0 +1,6 @@
+**/cache
+**/tmp
+**/.git
+/path/to/application-data/*/cache
+/path/to/application-data/*/tmp
+/path/to/restic

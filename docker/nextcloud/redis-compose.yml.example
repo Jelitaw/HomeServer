@@ -1,0 +1,20 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: nextcloud_redis
+    restart: unless-stopped
+
+    command: redis-server --save 60 1 --loglevel warning
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - homelab
+
+volumes:
+  redis_data:
+
+networks:
+  homelab:
+    external: true

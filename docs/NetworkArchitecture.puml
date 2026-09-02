@@ -1,0 +1,148 @@
+@startuml
+title Personal Server Infrastructure — Network Architecture
+
+left to right direction
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+' ============================================================
+' EXTERNAL NETWORK
+' ============================================================
+
+cloud "Internet" as internet
+rectangle "Public DNS\nPorkbun" as publicDNS
+rectangle "Fritz!Box\nDynamic DNS" as fritz
+
+
+' ============================================================
+' PHYSICALLY AWAY
+' ============================================================
+
+rectangle "Physically Away" as away {
+    rectangle "Laptop / Phone\nMobile Data / External Wi-Fi" as remote
+}
+
+
+' ============================================================
+' PHYSICALLY AT HOME
+' ============================================================
+
+rectangle "Physically at Home" as home {
+
+    rectangle "PC\nLAN" as pc
+    rectangle "Laptop / Phone\nHome Wi-Fi" as homeDevices
+    rectangle "Guest Phone\nGuest Wi-Fi" as guest
+
+    rectangle "HOME NETWORK" as network {
+
+        rectangle "WireGuard\nVPN" as wireguard
+
+        rectangle "Pi-hole\nDNS + Ad Blocking" as pihole
+
+        rectangle "Caddy\nReverse Proxy" as caddy
+
+        rectangle "Docker Services" as services {
+            rectangle "Immich" as immich
+            rectangle "Nextcloud" as nextcloud
+            rectangle "Vaultwarden" as vaultwarden
+            rectangle "Mealie" as mealie
+            rectangle "Firefly III" as firefly
+            rectangle "SparkyFitness" as fitness
+        }
+    }
+}
+
+
+' ============================================================
+' REMOTE CONNECTION
+' ============================================================
+
+remote --> internet : Internet access
+internet --> publicDNS : DNS lookup\nvpn.example.net
+publicDNS --> fritz : Resolves to\ncurrent public address
+fritz --> wireguard : WireGuard\nconnection
+wireguard --> network : Authenticated VPN\n -> home network
+
+
+' ============================================================
+' HOME CONNECTIONS
+' ============================================================
+
+pc --> network : LAN
+homeDevices --> network : Wi-Fi
+
+
+' ============================================================
+' GUEST NETWORK
+' ============================================================
+
+guest --> internet : Internet only
+guest .. network : No access
+
+
+' ============================================================
+' DNS
+' ============================================================
+
+pc --> pihole : DNS
+homeDevices --> pihole : DNS
+wireguard --> pihole : DNS
+
+pihole --> caddy : Internal DNS resolution\nservice.example.net
+
+
+' ============================================================
+' REVERSE PROXY
+' ============================================================
+
+caddy --> immich
+caddy --> nextcloud
+caddy --> vaultwarden
+caddy --> mealie
+caddy --> firefly
+caddy --> fitness
+
+
+' ============================================================
+' NOTES
+' ============================================================
+
+note top of wireguard
+  The only service intended
+  to be reachable from the
+  public Internet.
+
+  Authenticated VPN clients
+  gain access to the home
+  network.
+end note
+
+note top of pihole
+  DNS for home-network
+  and VPN clients.
+
+  • DNS blocking
+  • Internal DNS resolution
+  • Service hostnames
+end note
+
+note bottom of caddy
+  Receives requests for
+  internal service hostnames
+  and forwards them to the
+  appropriate Docker service.
+end note
+
+note bottom of guest
+  Guest network is isolated
+  from the home network.
+
+  Guests have Internet access,
+  but cannot access internal
+  services or use Pi-hole.
+end note
+
+@enduml

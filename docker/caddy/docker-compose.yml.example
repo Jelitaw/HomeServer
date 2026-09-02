@@ -1,0 +1,25 @@
+services:
+  caddy:
+    build: .
+    container_name: caddy
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    environment:
+      PORKBUN_API_KEY: ${PORKBUN_API_KEY}
+      PORKBUN_SECRET_API_KEY: ${PORKBUN_SECRET_API_KEY}
+
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./data/caddy:/data
+      - ./config/caddy:/config
+
+    networks:
+      - homelab
+
+networks:
+  homelab:
+    external: true
